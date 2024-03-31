@@ -13,15 +13,19 @@ from onnx.external_data_helper import load_external_data_for_model
 from onnx.helper import make_model
 from transformers import AutoTokenizer
 
-MODEL = "./exported-float16"
+MODEL_PATH = "./exported-float16"
 
 
-def main() -> int:
-    """main
+def merge_tokenizer(model_path: str) -> str:
+    """merge a tokenizer to a model.
     """
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL)
-    model = load_model(MODEL + "/model.onnx", load_external_data=False)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = load_model(
+        model_path + "/model.onnx",
+        load_external_data=False,
+    )
+    graph = model.graph
 
     pre_model, post_model = extensions.gen_processing_models(
         tokenizer,
@@ -34,8 +38,7 @@ def main() -> int:
         ("input_ids", "input_ids"),
         ("attention_mask", "attention_mask"),
     ]
-    # merged = compose.merge_models(pre_model, model, io_map)
-    graph = merge_graphs(pre_model.graph, model.graph, pre_io_map)
+    graph = merge_graphs(pre_model.graph, graph, pre_io_map)
 
     post_io_map = [
         ("logits", "ids"),
@@ -44,23 +47,34 @@ def main() -> int:
 
     opset_imports = model.opset_import
     opset_imports.extend(pre_model.opset_import)
-    opset_imports.extend(post_model.opset_import)
-    new_model = make_model(
+    # opset_imports.extend(post_model.opset_import)
+    merged_model = make_model(
         graph,
         opset_imports=opset_imports,
         functions=model.functions,
         ir_version=model.ir_version,
     )
+    load_external_data_for_model(merged_model, model_path)
 
-    load_external_data_for_model(new_model, MODEL)
-    if os.path.exists(MODEL + "/merged_model.onnx_data"):
-        os.remove(MODEL + "/merged_model.onnx_data")
+    merged_model_name = "merged_model.onnx"
+    if os.path.exists(model_path + "/" + merged_model_name + "_data"):
+        os.remove(model_path + "/" + merged_model_name + "_data")
     save_model(
-        new_model, MODEL + "/merged_model.onnx",
+        merged_model, model_path + "/" + merged_model_name,
         save_as_external_data=True,
-        location="merged_model.onnx_data",
+        location=merged_model_name + "_data",
     )
 
+    return merged_model_name
+
+
+def main() -> int:
+    """main
+    """
+
+    merge_tokenizer(MODEL_PATH)
+
+    # # The merged model could not be checked.
     # check_model(
     #     MODEL + "/merged_model.onnx",
     #     full_check=True,
