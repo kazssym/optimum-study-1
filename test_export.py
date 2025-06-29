@@ -27,7 +27,8 @@ def main() -> int:
     if os.path.exists("./exported-intermediate/model.onnx_data"):
         os.remove("./exported-intermediate/model.onnx_data")
     main_export(
-        "stabilityai/stablelm-3b-4e1t",
+        # "stabilityai/stablelm-3b-4e1t",
+        "ibm-granite/granite-3b-code-instruct-128k",
         output="./exported-intermediate",
         trust_remote_code=True,
         # dtype="fp16",
